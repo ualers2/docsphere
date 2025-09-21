@@ -1,0 +1,70 @@
+# in docker in docker it must be version 2.2
+# version: '2.2'
+# default version 
+version: '3.8'
+
+services:
+
+  frontend_docserver:
+    container_name: frontend_docserver
+    build:
+      context: ./Front-End
+      dockerfile: Dockerfile
+    working_dir: /app
+    # volumes:
+    #   - ./Front-End:/app
+
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+      - CHOKIDAR_INTERVAL=100
+    ports:
+      - "3007:3007" 
+    restart: always
+    command: >
+      sh -c "npm run dev -- --host 0.0.0.0 --port 3007"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:3007"] 
+      interval: 129s
+      timeout: 2s
+      retries: 5
+    networks:
+      - rede_externa
+    mem_limit: 500MB
+    cpus: "1.5"
+
+  docserver_api_1:
+    build:
+      context: ./Back-End
+      dockerfile: Dockerfile
+    container_name: docserver_api_1
+    restart: always
+    working_dir: /app
+    ports:
+      - "4251:4251"
+    command: [
+      "uvicorn", "server:asgi_app",
+      "--host", "0.0.0.0",
+      "--port", "4251",
+      "--workers", "3",
+      "--timeout-keep-alive", "3600"
+    ]
+    volumes:
+      # - ./Back-End:/app
+      - files_data:/app/videos
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:4251"] 
+      interval: 129s
+      timeout: 2s
+      retries: 5
+    mem_limit: 500MB
+    cpus: "1.5"
+    networks:
+      - rede_externa
+
+
+networks:
+  rede_externa:
+    external: true
+
+volumes:
+  files_data:
