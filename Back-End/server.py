@@ -34,15 +34,15 @@ app_instance = initialize_app(cred, {
 
 
 app = Flask(__name__)
-# # Apenas libera a URL efêmera de teste
-# CORS(app, resources={
-#     r"/api/*": {
-#         "origins": ["http://localhost:3007"],
-#         "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"],
-#         "allow_headers": ["Content-Type", "Authorization", "X-User-Id"],
-#         "supports_credentials": True
-#     }
-# })
+# Apenas libera a URL efêmera de teste
+CORS(app, resources={
+    r"/api/*": {
+        "origins": ["http://localhost:3007"],
+        "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"],
+        "allow_headers": ["Content-Type", "Authorization", "X-User-Id"],
+        "supports_credentials": True
+    }
+})
 asgi_app = WsgiToAsgi(app)
 
 app.secret_key = 'sua_chave_secreta'  # Substitua por uma chave forte e secreta
@@ -85,9 +85,15 @@ def allowed_file(filename):
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 def authenticate_user(req):
-    # Por enquanto, um mock:
-    mock_user_id = req.headers.get('X-User-Id')
-    return mock_user_id.replace('.', '_')
+    email = req.headers.get('X-User-Id')
+
+    snapshot = users_ref.get() or {}
+    for _, user in snapshot.items():
+        if user.get("email") == email:
+            logger.info("Usuário tem conta")
+                
+            return email.replace('.', '_')
+    return None
 
 @app.route('/')
 def index():
