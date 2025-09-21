@@ -58,6 +58,12 @@ jobs:
           printf '%s' '${{ secrets.FRONT_END_ENV_KEYS }}' > /home/administrator/deploys/docsphere/Front-End/.env
         "
 
+    - name: Create Firebase.json on VPS
+      run: |
+        ssh ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} "
+          echo '${{ secrets.FIREBASE_KEYS }}' | base64 --decode > /home/administrator/deploys/docsphere/Back-End/Keys/Firebase.json
+        "
+
     - name: Deploy Docker Compose
       run: |
         ssh ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} "
