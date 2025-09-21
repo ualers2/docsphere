@@ -8,10 +8,10 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "0.0.0.0", 
     port: 4343,
-    allowedHosts: ["localhost", "accepted-poorly-maggot.ngrok-free.app", "www.support.mediacutsstudio.com"],
+    allowedHosts: ["localhost", "accepted-poorly-maggot.ngrok-free.app", "docsphere.mediacutsstudio.com"],
     hmr: {
       protocol: 'wss',
-      host: 'support.mediacutsstudio.com', 
+      host: 'docsphere.mediacutsstudio.com', 
     },
     watch: {
       ignored: ['**/node_modules/**'],
