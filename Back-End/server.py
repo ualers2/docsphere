@@ -37,9 +37,9 @@ app = Flask(__name__)
 # Apenas libera a URL efêmera de teste
 CORS(app, resources={
     r"/api/*": {
-        "origins": ["http://localhost:3007", 'https://mediacutsstudio.com'],
+        "origins": ["http://localhost:3007"],
         "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"],
-        "allow_headers": ['Access-Control-Allow-Origin', "Content-Type", "Authorization", "X-User-Id"],
+        "allow_headers": ["Content-Type", "Authorization", "X-User-Id"],
         "supports_credentials": True
     }
 })
