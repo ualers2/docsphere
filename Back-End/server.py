@@ -35,14 +35,14 @@ app_instance = initialize_app(cred, {
 
 app = Flask(__name__)
 # Apenas libera a URL efêmera de teste
-CORS(app, resources={
-    r"/api/*": {
-        "origins": ["http://localhost:3007"],
-        "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"],
-        "allow_headers": ["Content-Type", "Authorization", "X-User-Id"],
-        "supports_credentials": True
-    }
-})
+# CORS(app, resources={
+#     r"/api/*": {
+#         "origins": ["http://localhost:3007"],
+#         "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"],
+#         "allow_headers": ["Content-Type", "Authorization", "X-User-Id"],
+#         "supports_credentials": True
+#     }
+# })
 asgi_app = WsgiToAsgi(app)
 
 app.secret_key = 'sua_chave_secreta'  # Substitua por uma chave forte e secreta
