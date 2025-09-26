@@ -94,9 +94,9 @@ def authenticate_user(req):
         logger.info(f"email {db_email}")
         if db_email == email.replace('_', '.'):
             logger.info("Usuário tem conta")
-            return email.replace('.', '_')
+            return email, email.replace('.', '_')
     logger.info("Usuário nao tem conta")
-    return None
+    return None, None
 
 @app.route('/')
 def index():
@@ -163,12 +163,10 @@ def login():
 @app.route('/api/projects/metadata/<user_id>/<project_name>', methods=['GET'])
 def get_project_metadata(user_id, project_name):
     try:
+        authenticated_user_id, authenticated_user_id_filter = authenticate_user(request)
         # Normaliza o nome do projeto como você faz ao salvar
         safe_project_name = secure_filename(project_name).replace("-", "").replace("....", "").replace("...", "").replace("..", "").replace(".", "").replace("... - ", "").replace('"????????"', '').replace("...__", "_")
         safe_project_name_filter = re.sub(r'[^0-9A-Za-z_-]', '', safe_project_name)
-
-        # Normaliza user_id (mesma lógica usada por você)
-        authenticated_user_id_filter = user_id.replace('.', '_')
 
         # Referência ao nó "metadata" do projeto
         ref = db.reference(
@@ -211,12 +209,11 @@ def get_project_metadata(user_id, project_name):
 
 @app.route('/api/projects/<user_id>', methods=['GET'])
 def get_user_projects(user_id):
-    authenticated_user_id = authenticate_user(request)
-    if not authenticated_user_id or authenticated_user_id != user_id:
+    authenticated_user_id, authenticated_user_id_filter = authenticate_user(request)
+    if not authenticated_user_id_filter or authenticated_user_id_filter != user_id:
         return jsonify({"message": "Não autorizado"}), 403
-    # authenticated_user_id_filter = user_id.replace('.', '_')
     try:
-        ref = db.reference(f'projects/{authenticated_user_id}', app=app_instance)
+        ref = db.reference(f'projects/{authenticated_user_id_filter}', app=app_instance)
         projects_data = ref.get()
 
         if not projects_data:
@@ -261,7 +258,7 @@ def create_project():
         "type_project": "video" ou "files"
     }
     """
-    authenticated_user_id = authenticate_user(request)
+    authenticated_user_id, authenticated_user_id_filter = authenticate_user(request)
     if not authenticated_user_id:
         return jsonify({"message": "Autenticação necessária"}), 401
 
@@ -317,12 +314,11 @@ def create_project():
     
 @app.route('/api/list-projects', methods=['GET'])
 def list_projects():
-    authenticated_user_id = authenticate_user(request)
+    authenticated_user_id, authenticated_user_id_filter = authenticate_user(request)
     if not authenticated_user_id:
         return jsonify({"message": "Autenticação necessária"}), 401
 
-    user_id_filter = authenticated_user_id.replace('.', '_')
-    projects_ref = db.reference(f'projects/{user_id_filter}', app=app_instance)
+    projects_ref = db.reference(f'projects/{authenticated_user_id_filter}', app=app_instance)
     projects = projects_ref.get() or {}
 
     result = [
@@ -336,10 +332,10 @@ def list_projects():
 def get_user_settings():
     """Obter configurações do usuário"""
     try:
-        authenticated_user_id = authenticate_user(request)
+        authenticated_user_id, authenticated_user_id_filter = authenticate_user(request)
         if not authenticated_user_id:
             return jsonify({"message": "Autenticação necessária"}), 401
-        settings_ref = db.reference(f'user_settings/{authenticated_user_id}', app=app_instance)
+        settings_ref = db.reference(f'user_settings/{authenticated_user_id_filter}', app=app_instance)
         settings = settings_ref.get()
         
         if not settings:
@@ -367,7 +363,7 @@ def save_user_settings():
         if not data:
             return jsonify({'error': 'Dados não fornecidos'}), 400
         
-        authenticated_user_id = authenticate_user(request)
+        authenticated_user_id, authenticated_user_id_filter = authenticate_user(request)
         if not authenticated_user_id:
             return jsonify({"message": "Autenticação necessária"}), 401
         # Estrutura das configurações
@@ -402,7 +398,7 @@ def save_user_settings():
         }
         
         # Salvar no Firebase
-        settings_ref = db.reference(f'user_settings/{authenticated_user_id}', app=app_instance)
+        settings_ref = db.reference(f'user_settings/{authenticated_user_id_filter}', app=app_instance)
         settings_ref.set(settings_data)
         
         return jsonify({
@@ -430,10 +426,10 @@ def change_password():
         
         # Verificar senha atual
 
-        authenticated_user_id = authenticate_user(request)
+        authenticated_user_id, authenticated_user_id_filter = authenticate_user(request)
         if not authenticated_user_id:
             return jsonify({"message": "Autenticação necessária"}), 401
-        user_ref = db.reference(f'users/{authenticated_user_id}', app=app_instance)
+        user_ref = db.reference(f'users/{authenticated_user_id_filter}', app=app_instance)
         user_data = user_ref.get()
         
         if not user_data:
@@ -454,7 +450,7 @@ def change_password():
         })
         
         # Log da alteração de senha
-        password_log_ref = db.reference(f'password_changes/{authenticated_user_id}', app=app_instance)
+        password_log_ref = db.reference(f'password_changes/{authenticated_user_id_filter}', app=app_instance)
         password_log_ref.push({
             'changedAt': datetime.now().isoformat(),
             'userEmail': authenticated_user_id,
@@ -473,7 +469,7 @@ def upload_profile_image():
         if 'image' not in request.files:
             return jsonify({'error': 'Nenhuma imagem fornecida'}), 400
 
-        authenticated_user_id = authenticate_user(request)
+        authenticated_user_id, authenticated_user_id_filter = authenticate_user(request)
         if not authenticated_user_id:
             return jsonify({"message": "Autenticação necessária"}), 401
             
@@ -510,10 +506,7 @@ def upload_profile_image():
         
         # Atualizar configurações do usuário com nova imagem
 
-        authenticated_user_id = authenticate_user(request)
-        if not authenticated_user_id:
-            return jsonify({"message": "Autenticação necessária"}), 401
-        settings_ref = db.reference(f'user_settings/{authenticated_user_id}', app=app_instance)
+        settings_ref = db.reference(f'user_settings/{authenticated_user_id_filter}', app=app_instance)
         settings_ref.update({
             'profile/avatar': image_url,
             'profile/avatarUpdatedAt': datetime.now().isoformat()
@@ -532,10 +525,10 @@ def delete_profile_image():
     """Remover imagem do perfil"""
     try:
 
-        authenticated_user_id = authenticate_user(request)
+        authenticated_user_id, authenticated_user_id_filter = authenticate_user(request)
         if not authenticated_user_id:
             return jsonify({"message": "Autenticação necessária"}), 401
-        settings_ref = db.reference(f'user_settings/{authenticated_user_id}', app=app_instance)
+        settings_ref = db.reference(f'user_settings/{authenticated_user_id_filter}', app=app_instance)
         
         # Obter URL da imagem atual
         current_settings = settings_ref.get()
@@ -564,15 +557,15 @@ def export_user_settings():
     """Exportar todas as configurações do usuário"""
     try:
 
-        authenticated_user_id = authenticate_user(request)
+        authenticated_user_id, authenticated_user_id_filter = authenticate_user(request)
         if not authenticated_user_id:
             return jsonify({"message": "Autenticação necessária"}), 401
         # Obter configurações
-        settings_ref = db.reference(f'user_settings/{authenticated_user_id}', app=app_instance)
+        settings_ref = db.reference(f'user_settings/{authenticated_user_id_filter}', app=app_instance)
         settings = settings_ref.get()
         
         # Obter dados do usuário
-        user_ref = db.reference(f'users/{authenticated_user_id}', app=app_instance)
+        user_ref = db.reference(f'users/{authenticated_user_id_filter}', app=app_instance)
         user_data = user_ref.get()
         
         export_data = {
@@ -599,7 +592,7 @@ def import_user_settings():
         if not data or 'settings' not in data:
             return jsonify({'error': 'Dados de configuração não fornecidos'}), 400
         
-        authenticated_user_id = authenticate_user(request)
+        authenticated_user_id, authenticated_user_id_filter = authenticate_user(request)
         if not authenticated_user_id:
             return jsonify({"message": "Autenticação necessária"}), 401
         settings_data = data['settings']
@@ -611,7 +604,7 @@ def import_user_settings():
         })
         
         # Salvar configurações importadas
-        settings_ref = db.reference(f'user_settings/{authenticated_user_id}', app=app_instance)
+        settings_ref = db.reference(f'user_settings/{authenticated_user_id_filter}', app=app_instance)
         settings_ref.set(settings_data)
         
         return jsonify({
@@ -627,7 +620,7 @@ def reset_user_settings():
     """Resetar configurações para valores padrão"""
     try:
 
-        authenticated_user_id = authenticate_user(request)
+        authenticated_user_id, authenticated_user_id_filter = authenticate_user(request)
         if not authenticated_user_id:
             return jsonify({"message": "Autenticação necessária"}), 401
         
@@ -663,7 +656,7 @@ def reset_user_settings():
         }
         
         # Resetar configurações
-        settings_ref = db.reference(f'user_settings/{authenticated_user_id}', app=app_instance)
+        settings_ref = db.reference(f'user_settings/{authenticated_user_id_filter}', app=app_instance)
         settings_ref.set(default_settings)
         
         return jsonify({
@@ -678,7 +671,7 @@ def reset_user_settings():
 def get_settings_activity_log():
     """Obter log de atividades das configurações"""
     try:
-        authenticated_user_id = authenticate_user(request)
+        authenticated_user_id, authenticated_user_id_filter = authenticate_user(request)
         if not authenticated_user_id:
             return jsonify({"message": "Autenticação necessária"}), 401
         
@@ -686,7 +679,7 @@ def get_settings_activity_log():
         logs = []
         
         # Log de configurações
-        settings_ref = db.reference(f'user_settings/{authenticated_user_id}', app=app_instance)
+        settings_ref = db.reference(f'user_settings/{authenticated_user_id_filter}', app=app_instance)
         settings = settings_ref.get()
         
         if settings:
@@ -712,7 +705,7 @@ def get_settings_activity_log():
                 })
         
         # Log de mudanças de senha
-        password_log_ref = db.reference(f'password_changes/{authenticated_user_id}', app=app_instance)
+        password_log_ref = db.reference(f'password_changes/{authenticated_user_id_filter}', app=app_instance)
         password_logs = password_log_ref.get()
         
         if password_logs:
@@ -742,8 +735,7 @@ def get_settings_activity_log():
 # o endpoint aceita arquivos alem de video.
 @app.route('/api/upload-video', methods=['POST'])
 def upload_video():
-    authenticated_user_id = authenticate_user(request)
-    authenticated_user_id_filter = authenticated_user_id.replace('.', '_')
+    authenticated_user_id, authenticated_user_id_filter = authenticate_user(request)
     
     if not authenticated_user_id:
         return jsonify({"message": "Autenticação necessária"}), 401
@@ -899,14 +891,13 @@ def download_video_optimized(project_name, video_id):
     Recebe nome do projeto + id do vídeo para buscar diretamente no caminho do Firebase
     e evitar varreduras/loops que geram alto consumo do Realtime DB.
     """
-    authenticated_user_id = authenticate_user(request)
+    authenticated_user_id, authenticated_user_id_filter = authenticate_user(request)
     if not authenticated_user_id:
         return jsonify({"message": "Autenticação necessária"}), 401
     
 
     # Sanitização do nome do projeto (mantive a mesma lógica usada no preview)
     project_name_safe = secure_filename(project_name).replace("-", "").replace("....", "").replace("...", "").replace("..", "").replace(".", "").replace("... - ", "").replace('"????????"', '').replace("...__", "_")
-    authenticated_user_id_filter = authenticated_user_id.replace('.', '_')
     logger.info(f"[DOWNLOAD] for {project_name_safe}")
 
     cache_key = f"{authenticated_user_id_filter}_{project_name_safe}_{video_id}"
@@ -962,10 +953,9 @@ def download_video_optimized(project_name, video_id):
 # --- Rota de download legacy ---
 @app.route('/api/videos/<video_id>', methods=['GET'])
 def download_video(video_id):
-    authenticated_user_id = authenticate_user(request)
+    authenticated_user_id, authenticated_user_id_filter = authenticate_user(request)
     if not authenticated_user_id:
         return jsonify({"message": "Autenticação necessária"}), 401
-    authenticated_user_id_filter = authenticated_user_id.replace('.', '_')
 
     try:
         user_projects_ref = db.reference(f'projects/{authenticated_user_id_filter}/', app=app_instance)
@@ -1017,13 +1007,12 @@ def preview_video_optimized(project_name, video_id):
     Busca otimizada que utiliza o nome do projeto e o ID do vídeo para
     ir diretamente ao caminho no Firebase, minimizando o download de dados.
     """
-    authenticated_user_id = authenticate_user(request)
+    authenticated_user_id, authenticated_user_id_filter = authenticate_user(request)
     if not authenticated_user_id:
         return jsonify({"message": "Autenticação necessária"}), 401
     
     # Sanitiza o nome do projeto para segurança
     project_name_safe = secure_filename(project_name).replace("-", "").replace("....", "").replace("...", "").replace("..", "").replace(".", "").replace("... - ", "").replace('"????????"', '').replace("...__", "_")
-    authenticated_user_id_filter = authenticated_user_id.replace('.', '_')
     
     cache_key = f"{authenticated_user_id_filter}_{project_name_safe}_{video_id}"
     
@@ -1091,13 +1080,12 @@ def serve_file_content(project_name, file_id):
     - Se for .txt, .md, .json etc => retorna conteúdo direto (text/plain ou application/json).
     - Se for outro formato => faz download.
     """
-    authenticated_user_id = authenticate_user(request)
+    authenticated_user_id, authenticated_user_id_filter = authenticate_user(request)
     if not authenticated_user_id:
         return jsonify({"message": "Autenticação necessária"}), 401
 
     # Sanitização do nome do projeto
     project_name_safe = secure_filename(project_name).replace("-", "").replace("....", "").replace("...", "").replace("..", "").replace(".", "").replace("... - ", "").replace('"????????"', '').replace("...__", "_")
-    authenticated_user_id_filter = authenticated_user_id.replace('.', '_')
 
     cache_key = f"{authenticated_user_id_filter}_{project_name_safe}_{file_id}"
     now = time.time()
@@ -1164,17 +1152,16 @@ def serve_file_content(project_name, file_id):
 
 @app.route('/api/projects/<project_name>', methods=['DELETE'])
 def delete_project(project_name):
-    user_email = request.headers.get('X-User-Id')
-    if not user_email:
+    authenticated_user_id, authenticated_user_id_filter = authenticate_user(request)
+    if not authenticated_user_id:
         return jsonify({"message": "Usuário não autenticado"}), 401
 
     try:
-        user_key = user_email.replace('.', '_')
         safe_project_name = secure_filename(project_name).replace("-", "").replace("....", "").replace("...", "").replace("..", "").replace(".", "").replace("... - ", "").replace('"????????"', '').replace("...__", "_")
         safe_project_name_filter = re.sub(r'[^0-9A-Za-z_-]', '', safe_project_name)
 
         # Caminhos no disco
-        user_dir = os.path.join(VIDEO_BASE_DIR, user_key)
+        user_dir = os.path.join(VIDEO_BASE_DIR, authenticated_user_id_filter)
         project_dir = os.path.join(user_dir, safe_project_name_filter)
 
         # 1) Remover arquivos do projeto no disco
@@ -1191,7 +1178,7 @@ def delete_project(project_name):
             # Prossegue para remover do DB, mas informa falha parcial
 
         # 2) Remover referência no Firebase RTDB
-        ref = db.reference(f'projects/{user_key}/{safe_project_name_filter}', app=app_instance)
+        ref = db.reference(f'projects/{authenticated_user_id_filter}/{safe_project_name_filter}', app=app_instance)
         existed_in_db = ref.get() is not None
         if existed_in_db:
             ref.delete()
@@ -1200,7 +1187,7 @@ def delete_project(project_name):
             logger.info(f"[delete-project] Projeto '{safe_project_name_filter}' não existia no Firebase.")
 
         # 3) Limpar entradas de cache relacionadas ao projeto
-        _clear_project_cache_entries(user_key, safe_project_name_filter)
+        _clear_project_cache_entries(authenticated_user_id_filter, safe_project_name_filter)
 
         # 4) Limpeza opcional do diretório do usuário se vazio
         _cleanup_user_dir_if_empty(user_dir)
@@ -1232,18 +1219,17 @@ def delete_single_video(project_name, video_id):
     Deleta somente um vídeo/arquivo do projeto do usuário (remove arquivo no disco + nó no Firebase).
     Requer header 'X-User-Id' (mock de autenticação usado atualmente).
     """
-    user_email = authenticate_user(request)
-    if not user_email:
+    authenticated_user_id, authenticated_user_id_filter = authenticate_user(request)
+    if not authenticated_user_id:
         return jsonify({"message": "Usuário não autenticado"}), 401
 
     try:
-        # Normalizações (mesma lógica usada em outras rotas)
-        user_key = user_email.replace('.', '_')
+        # Normalizações 
         safe_project_name = secure_filename(project_name).replace("-", "").replace("....", "").replace("...", "").replace("..", "").replace(".", "").replace("... - ", "").replace('"????????"', '').replace("...__", "_")
         safe_project_name_filter = re.sub(r'[^0-9A-Za-z_-]', '', safe_project_name)
 
         # Referência ao item no Firebase
-        video_ref_path = f'projects/{user_key}/{safe_project_name_filter}/videos/{video_id}'
+        video_ref_path = f'projects/{authenticated_user_id_filter}/{safe_project_name_filter}/videos/{video_id}'
         video_ref = db.reference(video_ref_path, app=app_instance)
         video_data = video_ref.get()
 
@@ -1294,13 +1280,13 @@ def delete_single_video(project_name, video_id):
 
         # Limpa cache referente ao projeto
         try:
-            _clear_project_cache_entries(user_key, safe_project_name_filter)
+            _clear_project_cache_entries(authenticated_user_id_filter, safe_project_name_filter)
         except Exception:
             pass
 
         # Limpa diretório do usuário se vazio (opcional)
         try:
-            _cleanup_user_dir_if_empty(os.path.join(VIDEO_BASE_DIR, user_key))
+            _cleanup_user_dir_if_empty(os.path.join(VIDEO_BASE_DIR, authenticated_user_id_filter))
         except Exception:
             pass
 
@@ -1320,20 +1306,19 @@ def delete_single_video(project_name, video_id):
 
 @app.route('/api/projects/<project_name>/mark-utilizado', methods=['POST'])
 def mark_project_utilizado(project_name):
-    user_email = request.headers.get('X-User-Id')
-    if not user_email:
+    authenticated_user_id, authenticated_user_id_filter = authenticate_user(request)
+    if not authenticated_user_id:
         return jsonify({"message": "Usuário não autenticado"}), 401
 
     try:
         data = request.json or {}
         utilizado = data.get("utilizado", True)
         logger.info(f"[mark-utilizado] '{utilizado}' ")
-        user_key = user_email.replace('.', '_')
         safe_project_name = secure_filename(project_name).replace("-", "").replace("....", "").replace("...", "").replace("..", "").replace(".", "").replace("... - ", "").replace('"????????"', '').replace("...__", "_")
         safe_project_name_filter = re.sub(r'[^0-9A-Za-z_-]', '', safe_project_name)
     
         logger.info(f"[mark-utilizado] safe_project_name_filter '{safe_project_name_filter}' ")
-        ref = db.reference(f'projects/{user_key}/{safe_project_name_filter}', app=app_instance)
+        ref = db.reference(f'projects/{authenticated_user_id_filter}/{safe_project_name_filter}', app=app_instance)
         timestamp_now = datetime.utcnow().isoformat() + 'Z'  # formato ISO UTC
         ref.update({
             "used": utilizado,
@@ -1348,16 +1333,9 @@ def mark_project_utilizado(project_name):
 # A rota para servir o arquivo permanece inalterada
 @app.route('/api/files/stream/<path:path>', methods=['GET'])
 def serve_static_video(path):
-    """
-    ... (código original para servir o arquivo) ...
-    """
-    authenticated_user_id = authenticate_user(request)
+    authenticated_user_id, authenticated_user_id_filter = authenticate_user(request)
     if not authenticated_user_id:
         return jsonify({"message": "Autenticação necessária"}), 401
-    
-    authenticated_user_id_filter = authenticated_user_id.replace('.', '_')
-    if authenticated_user_id_filter not in path:
-        return jsonify({"message": "Não autorizado"}), 403
 
     full_file_path = os.path.join(VIDEO_BASE_DIR, path)
     if not os.path.exists(full_file_path):
@@ -1371,10 +1349,9 @@ def serve_static_video(path):
 @app.route('/api/videos/<video_id>/preview/file', methods=['GET'])
 def serve_video_preview(video_id):
     """Serve o arquivo real do vídeo para streaming"""
-    authenticated_user_id = authenticate_user(request)
+    authenticated_user_id, authenticated_user_id_filter = authenticate_user(request)
     if not authenticated_user_id:
         return jsonify({"message": "Autenticação necessária"}), 401
-    authenticated_user_id_filter = authenticated_user_id.replace('.', '_')
 
     user_projects_ref = db.reference(f'projects/{authenticated_user_id_filter}/', app=app_instance)
     user_projects_data = user_projects_ref.get()
