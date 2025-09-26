@@ -16,31 +16,56 @@ console_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
 logger.addHandler(console_handler)
 
-def upload_(name_project, VIDEO_FILE_PATH, USER_ID_FOR_TEST):
+def upload_(name_project, VIDEO_FILE_PATH, USER_ID_FOR_TEST, 
+            type_project="files",
+            title='',
+            description='',
+            hashtags='',
+            minutagemdeInicio='',
+            minutagemdeFim='',
+            urltumbnail='',
+            justificativa='',
+            sentimento_principal='',
+            potencial_de_viralizacao='',
+
+
+            ):
     UPLOAD_URL = os.getenv("UPLOAD_URL", "https://videomanager.api.mediacutsstudio.com")
-    
-    video_metadata = {
-        "projectName": name_project,
-        "type_project": "files",
 
-    }
+    if type_project == "files":
+            
+        video_metadata = {
+            "projectName": name_project,
+            "type_project": type_project,
 
-    # --- Verificações Iniciais ---
+        }
+    elif type_project == "video":
+        video_metadata = {
+            "projectName": name_project,
+            "type_project": "video",
+            "title": title,
+            "description": description,
+            "hashtags": hashtags,
+            "minutagemdeInicio": minutagemdeInicio,
+            "minutagemdeFim": minutagemdeFim,
+            "urltumbnail": urltumbnail,
+            "justificativa": justificativa,
+            "sentimento_principal": sentimento_principal,
+            "potencial_de_viralizacao": potencial_de_viralizacao
+        }
+
     if not os.path.exists(VIDEO_FILE_PATH):
         logger.info(f"Erro: O arquivo '{VIDEO_FILE_PATH}' não foi encontrado.")
         logger.info("Por favor, crie um arquivo MP4 com este nome ou ajuste o caminho.")
         exit()
 
-    # --- Preparação da Requisição ---
-
-    # Abre o arquivo de vídeo em modo binário
     try:
         with open(VIDEO_FILE_PATH, 'rb') as video_file:
             files = {
                 'file': (os.path.basename(VIDEO_FILE_PATH), video_file, 'video/mp4')
             }
             data = {
-                'metadata': json.dumps(video_metadata) # Converte o dicionário de metadados para uma string JSON
+                'metadata': json.dumps(video_metadata) 
             }
             headers = {
                 'X-User-Id': USER_ID_FOR_TEST 
