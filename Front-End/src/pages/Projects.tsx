@@ -69,7 +69,7 @@ export default function Projects() {
 
     setLoading(true);
     try {
-      const res = await apiFetch(`/projects/${encodeURIComponent(resolvedUserEmail)}`, { method: 'GET' });
+      const res = await apiFetch(`/projects`, { method: 'GET' });
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
       const mapped: Project[] = (Array.isArray(data) ? data : []).map((p: any, idx: number) => {

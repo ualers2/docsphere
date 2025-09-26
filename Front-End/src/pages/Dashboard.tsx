@@ -102,7 +102,7 @@ export default function Dashboard() {
   async function loadDashboardData() {
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(userEmail)}`, {
+      const res = await fetch(`${API_BASE}/projects`, {
         headers: { "X-User-Id": userEmail }
       });
       if (!res.ok) throw new Error(await res.text());
