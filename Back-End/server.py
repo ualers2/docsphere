@@ -207,8 +207,8 @@ def get_project_metadata(user_id, project_name):
         logger.error(f"Erro em /api/projects/metadata/{user_id}/{project_name}: {e}", exc_info=True)
         return jsonify({"message": f"Erro ao buscar metadados: {str(e)}"}), 500
 
-@app.route('/api/projects/<user_id>', methods=['GET'])
-def get_user_projects(user_id):
+@app.route('/api/projects', methods=['GET'])
+def get_user_projects():
     authenticated_user_id, authenticated_user_id_filter = authenticate_user(request)
     if not authenticated_user_id:
         return jsonify({"message": "Não autorizado"}), 403
@@ -840,7 +840,7 @@ def upload_video():
                 "filename": original_filename,
                 "project_name": project_name,
                 "type_project": type_project
-            }), 200 # 200 OK para atualização
+            }), 200 
 
         except Exception as e:
             print(f"Erro ao atualizar metadados no Firebase: {e}")

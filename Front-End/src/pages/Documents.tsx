@@ -52,7 +52,7 @@ export default function Documents() {
       return;
     }
     try {
-      const res = await apiFetch(`/projects/${encodeURIComponent(resolvedUserEmail)}`);
+      const res = await apiFetch(`/projects`);
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
       // transformar projetos em documentos
