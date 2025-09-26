@@ -55,7 +55,7 @@ export default function Recent() {
 
     setLoading(true);
     try {
-      const res = await fetch(`${UPLOAD_URL}/projects/${encodeURIComponent(resolvedUserEmail)}`, {
+      const res = await fetch(`${UPLOAD_URL}/projects`, {
         headers: { 'X-User-Id': resolvedUserEmail }
       });
 
