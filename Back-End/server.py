@@ -210,7 +210,7 @@ def get_project_metadata(user_id, project_name):
 @app.route('/api/projects/<user_id>', methods=['GET'])
 def get_user_projects(user_id):
     authenticated_user_id, authenticated_user_id_filter = authenticate_user(request)
-    if not authenticated_user_id_filter or authenticated_user_id_filter != user_id:
+    if not authenticated_user_id:
         return jsonify({"message": "Não autorizado"}), 403
     try:
         ref = db.reference(f'projects/{authenticated_user_id_filter}', app=app_instance)
