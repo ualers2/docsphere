@@ -86,13 +86,16 @@ def allowed_file(filename):
 
 def authenticate_user(req):
     email = req.headers.get('X-User-Id')
-
+    
     snapshot = users_ref.get() or {}
     for _, user in snapshot.items():
-        if user.get("email") == email:
+        db_email = user.get("email") 
+        logger.info(f"X-User-Id {email}")
+        logger.info(f"email {db_email}")
+        if db_email == email.replace('_', '.'):
             logger.info("Usuário tem conta")
-                
             return email.replace('.', '_')
+    logger.info("Usuário nao tem conta")
     return None
 
 @app.route('/')
@@ -208,12 +211,12 @@ def get_project_metadata(user_id, project_name):
 
 @app.route('/api/projects/<user_id>', methods=['GET'])
 def get_user_projects(user_id):
-    # authenticated_user_id = authenticate_user(request)
-    # if not authenticated_user_id or authenticated_user_id != user_id:
-    #     return jsonify({"message": "Não autorizado"}), 403
-    authenticated_user_id_filter = user_id.replace('.', '_')
+    authenticated_user_id = authenticate_user(request)
+    if not authenticated_user_id or authenticated_user_id != user_id:
+        return jsonify({"message": "Não autorizado"}), 403
+    # authenticated_user_id_filter = user_id.replace('.', '_')
     try:
-        ref = db.reference(f'projects/{authenticated_user_id_filter}', app=app_instance)
+        ref = db.reference(f'projects/{authenticated_user_id}', app=app_instance)
         projects_data = ref.get()
 
         if not projects_data:
@@ -841,6 +844,7 @@ def upload_video():
             return jsonify({
                 "message": f"{'Vídeo' if type_project == 'video' else 'Arquivo'} e metadados atualizados com sucesso!",
                 "item_id": video_id,
+                "video_id": video_id,
                 "filename": original_filename,
                 "project_name": project_name,
                 "type_project": type_project
@@ -886,6 +890,7 @@ def upload_video():
                 "project_name": project_name
 
             }), 201 # 201 Created
+
 
 @app.route('/api/projects/<project_name>/videos/<video_id>/download', methods=['GET'])
 def download_video_optimized(project_name, video_id):
