@@ -989,13 +989,20 @@ def download_video_optimized(project_name, video_id):
 
     try:
         # Usamos send_from_directory para manter compatibilidade (Flask >=2.2 suporta download_name)
-        return send_from_directory(directory, actual_filename_on_disk, as_attachment=True, download_name=video_filename)
+        return send_from_directory(directory, 
+                                   actual_filename_on_disk, 
+                                   as_attachment=True, 
+                                   download_name=video_filename,
+                                   conditional=False
+                                )
     except (ConnectionResetError, BrokenPipeError) as e:
         logger.warning(f"Cliente desconectou durante o envio do arquivo {video_filename}: {e}")
         return Response(status=499)
     except Exception as e:
         logger.error(f"Erro inesperado ao enviar arquivo {video_filename}: {e}", exc_info=True)
         return jsonify({"message": f"Erro ao enviar vídeo: {str(e)}"}), 500
+
+
 
 # --- Rota de download legacy ---
 @app.route('/api/videos/<video_id>', methods=['GET'])
