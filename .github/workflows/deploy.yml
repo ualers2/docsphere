@@ -36,7 +36,7 @@ jobs:
         rsync -avz --delete ./ ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/home/administrator/deploys/docsphere \
           --exclude node_modules \
           --exclude .git \
-          --exclude front-end/node_modules
+          --exclude Front-End/node_modules
 
     - name: Make dir on VPS
       run: |
