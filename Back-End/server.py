@@ -63,12 +63,15 @@ logger.addHandler(console_handler)
 
 
 
+
 users_ref = db.reference("users", app=app_instance)
 video_path_cache = {}
 CACHE_TTL = 300 
+CHUNK_SIZE =  1 * 1024 * 1024
 VIDEO_BASE_DIR = os.path.join(os.path.dirname(__file__), 'videos')
 ALLOWED_EXTENSIONS = {
     'mp4',
+    'txt',
     'srt', 'ass', 'pickle', 'json',
     'wav',
     'jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp',
@@ -732,105 +735,149 @@ def get_settings_activity_log():
         return jsonify({'error': f'Erro ao obter log de atividades: {str(e)}'}), 500
 
 
-# o endpoint aceita arquivos alem de video.
+
 @app.route('/api/upload-video', methods=['POST'])
-def upload_video():
+def upload_files():
     authenticated_user_id, authenticated_user_id_filter = authenticate_user(request)
-    
     if not authenticated_user_id:
         return jsonify({"message": "Autenticação necessária"}), 401
 
-    # 1. Verificar se o arquivo e os metadados estão presentes na requisição
-    if 'file' not in request.files:
-        return jsonify({"message": "Nenhum arquivo de vídeo enviado"}), 400
-    if 'metadata' not in request.form:
-        return jsonify({"message": "Nenhum metadado enviado"}), 400
+    content_type = request.content_type or ""
+    is_multipart = content_type.startswith("multipart/form-data")
 
-    file = request.files['file']
-    
-    # Carregar metadados como JSON
-    try:
-        metadata_str = request.form['metadata']
-        metadata = json.loads(metadata_str)
-    except json.JSONDecodeError:
-        return jsonify({"message": "Metadados inválidos (não é JSON válido)"}), 400
+    # helper para sanitizar nome do projeto
+    def sanitize_project_name(raw):
+        safe_project_name = secure_filename(raw or "")
+        safe_project_name = safe_project_name.replace("-", "").replace("....", "").replace("...", "").replace("..", "").replace(".", "").replace("... - ", "").replace('"????????"', '').replace("...__", "_")
+        return re.sub(r'[^0-9A-Za-z_-]', '', safe_project_name)
 
-    # Validar nome do arquivo
-    if file.filename == '':
-        return jsonify({"message": "Nome de arquivo inválido"}), 400
-    if not allowed_file(file.filename):
-        return jsonify({"message": "Tipo de arquivo não permitido"}), 400
+    # --- modo multipart/form-data (com form + file) ---
+    if is_multipart:
+        # validar presença de arquivo e metadata
+        if 'file' not in request.files:
+            return jsonify({"message": "Nenhum arquivo de vídeo enviado"}), 400
+        if 'metadata' not in request.form:
+            return jsonify({"message": "Nenhum metadado enviado"}), 400
 
-    # Extrair nome do projeto dos metadados
-    project_name = metadata.get('projectName')
-    if not project_name:
-        return jsonify({"message": "Nome do projeto é obrigatório nos metadados"}), 400
-
-    # 2. Sanitizar nomes para uso em caminhos de arquivo/IDs
-    # Isso é crucial para evitar ataques de path traversal e garantir nomes de arquivos válidos
-    safe_project_name = secure_filename(project_name).replace("-", "").replace("....", "").replace("...", "").replace("..", "").replace(".", "").replace("... - ", "").replace('"????????"', '').replace("...__", "_")
-    safe_project_name_filter = re.sub(r'[^0-9A-Za-z_-]', '', safe_project_name)
-    print(safe_project_name_filter)
-        
-    user_dir = os.path.join(VIDEO_BASE_DIR, authenticated_user_id_filter)
-    project_dir = os.path.join(user_dir, safe_project_name_filter)
-
-    # Criar diretórios se não existirem
-    try:
-        os.makedirs(project_dir, exist_ok=True)
-    except OSError as e:
-        print(f"Erro ao criar diretório: {e}")
-        return jsonify({"message": "Erro no servidor ao preparar armazenamento"}), 500
-
-    # Gerar um ID único para o vídeo e usar no nome do arquivo
-    video_id = str(uuid.uuid4())
-    original_filename = secure_filename(file.filename)
-    # Opcional: manter o nome original e adicionar o ID, ex: "meu_video_<uuid>.mp4"
-    filename_on_disk = f"{video_id}_{original_filename}" 
-    file_path = os.path.join(project_dir, filename_on_disk)
-
-    # 3. Salvar o arquivo no sistema de arquivos local
-    try:
-        file.save(file_path)
-    except Exception as e:
-        print(f"Erro ao salvar arquivo: {e}")
-        return jsonify({"message": "Erro ao salvar arquivo de vídeo no servidor"}), 500
-
-    # 4. Preparar metadados para o Firebase Realtime Database
-    # Incluir o caminho do arquivo no servidor
-    type_project = metadata.get('type_project', 'video')
-    if type_project == "video":
-        update_data = {
-            "filename": original_filename,
-            "serverFilePath": os.path.relpath(file_path, VIDEO_BASE_DIR),
-            "uploadedAt": datetime.now().isoformat(),
-            "status": "UPLOADED", # Atualiza o status
-            "progress_percent": "100" # Se o upload é a fase final
-        }
-        update_data.update({
-            "type_project": "video",
-            "title": metadata.get('title', original_filename),
-            "descricao": metadata.get('description', ''),
-            "hashtags": metadata.get('hashtags', []),
-            "minutagemdeInicio": metadata.get('minutagemdeInicio', '00:00'),
-            "minutagemdeFim": metadata.get('minutagemdeFim', 'Fim'),
-            "urltumbnail": metadata.get('urltumbnail', ''),
-            "justificativa": metadata.get('justificativa', ''),
-            "sentimento_principal": metadata.get('sentimento_principal', ''),
-            "potencial_de_viralizacao": metadata.get('potencial_de_viralizacao', ''),
-        })
-        # Assegurar que hashtags é uma lista de strings
-        if isinstance(update_data["hashtags"], str):
-            update_data["hashtags"] = [tag.strip() for tag in update_data["hashtags"].split(',') if tag.strip()]
-
-
-        # 5. Atualizar Firebase Realtime Database usando .update()
+        file = request.files['file']
         try:
-            # Caminho para o nó específico do item (vídeo ou arquivo) dentro do projeto
+            metadata = json.loads(request.form['metadata'])
+        except Exception:
+            return jsonify({"message": "Metadados inválidos (não é JSON válido)"}), 400
+
+        if file.filename == '':
+            return jsonify({"message": "Nome de arquivo inválido"}), 400
+        if not allowed_file(file.filename):
+            return jsonify({"message": "Tipo de arquivo não permitido"}), 400
+
+        project_name = metadata.get('projectName')
+        if not project_name:
+            return jsonify({"message": "Nome do projeto é obrigatório nos metadados"}), 400
+
+        safe_project_name_filter = sanitize_project_name(project_name)
+        user_dir = os.path.join(VIDEO_BASE_DIR, authenticated_user_id_filter)
+        project_dir = os.path.join(user_dir, safe_project_name_filter)
+        try:
+            os.makedirs(project_dir, exist_ok=True)
+        except OSError as e:
+            logger.exception("Erro ao criar diretório")
+            return jsonify({"message": "Erro no servidor ao preparar armazenamento"}), 500
+
+        video_id = str(uuid.uuid4())
+        original_filename = secure_filename(file.filename)
+        filename_on_disk = f"{video_id}_{original_filename}"
+        file_path = os.path.join(project_dir, filename_on_disk)
+
+        try:
+            file.save(file_path)  # mesmo comportamento de antes
+        except Exception as e:
+            logger.exception("Erro ao salvar arquivo (multipart)")
+            return jsonify({"message": "Erro ao salvar arquivo de vídeo no servidor"}), 500
+
+    # --- modo stream (raw binary) ---
+    else:
+        # Para streaming exigimos que os metadados (JSON) e filename venham por header ou query param.
+        # Headers aceitos: X-Filename, X-Metadata (JSON string)
+        filename_header = request.headers.get("X-Filename") or request.args.get("filename")
+        metadata_header = request.headers.get("X-Metadata") or request.args.get("metadata")
+
+        if not filename_header:
+            return jsonify({"message": "Cabeçalho X-Filename ausente para upload em stream"}), 400
+        if not metadata_header:
+            return jsonify({"message": "Cabeçalho X-Metadata ausente para upload em stream"}), 400
+
+        try:
+            metadata = json.loads(metadata_header)
+        except Exception:
+            return jsonify({"message": "Metadados inválidos (X-Metadata não é JSON válido)"}), 400
+
+        project_name = metadata.get('projectName')
+        if not project_name:
+            return jsonify({"message": "Nome do projeto é obrigatório nos metadados"}), 400
+
+        if not allowed_file(filename_header):
+            return jsonify({"message": "Tipo de arquivo não permitido"}), 400
+
+        safe_project_name_filter = sanitize_project_name(project_name)
+        user_dir = os.path.join(VIDEO_BASE_DIR, authenticated_user_id_filter)
+        project_dir = os.path.join(user_dir, safe_project_name_filter)
+        try:
+            os.makedirs(project_dir, exist_ok=True)
+        except OSError as e:
+            logger.exception("Erro ao criar diretório (stream)")
+            return jsonify({"message": "Erro no servidor ao preparar armazenamento"}), 500
+
+        video_id = str(uuid.uuid4())
+        original_filename = secure_filename(filename_header)
+        filename_on_disk = f"{video_id}_{original_filename}"
+        file_path = os.path.join(project_dir, filename_on_disk)
+
+        # grava o body em chunks (streaming)
+        try:
+            with open(file_path, "wb") as f:
+                while True:
+                    chunk = request.stream.read(CHUNK_SIZE)
+                    if not chunk:
+                        break
+                    f.write(chunk)
+        except Exception as e:
+            logger.exception("Erro ao salvar arquivo (stream)")
+            # tenta remover arquivo incompleto
+            try:
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+            except Exception:
+                pass
+            return jsonify({"message": "Erro ao salvar arquivo de vídeo no servidor (stream)"}), 500
+
+    # --- A partir daqui o arquivo está salvo em file_path; vamos montar os metadados e atualizar o Firebase ---
+    try:
+        type_project = metadata.get('type_project', 'video')
+        if type_project == "video":
+            update_data = {
+                "filename": original_filename,
+                "serverFilePath": os.path.relpath(file_path, VIDEO_BASE_DIR),
+                "uploadedAt": datetime.now().isoformat(),
+                "status": "UPLOADED",
+                "progress_percent": "100",
+            }
+            update_data.update({
+                "type_project": "video",
+                "title": metadata.get('title', original_filename),
+                "descricao": metadata.get('description', ''),
+                "hashtags": metadata.get('hashtags', []),
+                "minutagemdeInicio": metadata.get('minutagemdeInicio', '00:00'),
+                "minutagemdeFim": metadata.get('minutagemdeFim', 'Fim'),
+                "urltumbnail": metadata.get('urltumbnail', ''),
+                "justificativa": metadata.get('justificativa', ''),
+                "sentimento_principal": metadata.get('sentimento_principal', ''),
+                "potencial_de_viralizacao": metadata.get('potencial_de_viralizacao', ''),
+            })
+            if isinstance(update_data["hashtags"], str):
+                update_data["hashtags"] = [tag.strip() for tag in update_data["hashtags"].split(',') if tag.strip()]
+
             item_ref_path = f'projects/{authenticated_user_id_filter}/{safe_project_name_filter}/videos/{video_id}'
             item_ref = db.reference(item_ref_path, app=app_instance)
-            
-            # Realiza a atualização dos dados
             item_ref.update(update_data)
 
             return jsonify({
@@ -840,38 +887,28 @@ def upload_video():
                 "filename": original_filename,
                 "project_name": project_name,
                 "type_project": type_project
-            }), 200 
+            }), 200
 
-        except Exception as e:
-            print(f"Erro ao atualizar metadados no Firebase: {e}")
-            if os.path.exists(file_path):
-                os.remove(file_path)
-            return jsonify({"message": f"Erro interno do servidor: {str(e)}"}), 500
+        elif type_project == "files":
+            file_size = os.path.getsize(file_path)
+            video_metadata_for_firebase = {
+                "type_project": "files",
+                "id": video_id,
+                "filename": original_filename,
+                "serverFilePath": os.path.relpath(file_path, VIDEO_BASE_DIR),
+                "uploadedAt": datetime.now().isoformat(),
+                "size": file_size,
+                "status": "ready"
+            }
 
-
-    elif type_project == "files":
-        video_metadata_for_firebase = {
-            "type_project": "files",
-            "id": video_id, 
-            "filename": original_filename, #
-            "serverFilePath": os.path.relpath(file_path, VIDEO_BASE_DIR),
-            "uploadedAt": datetime.now().isoformat() ,
-            "size": os.path.getsize(file_path),
-            "status": "ready"
-        }
-
-        project_ref = db.reference(f'projects/{authenticated_user_id_filter}/{safe_project_name_filter}', app=app_instance)
-
-        if type_project == "files":
+            project_ref = db.reference(f'projects/{authenticated_user_id_filter}/{safe_project_name_filter}', app=app_instance)
             existing_project = project_ref.get()
             if not existing_project:
-                # Se o projeto não existir, crie-o com alguns metadados básicos
                 project_ref.set({
-                "name": project_name,
-                "createdAt": datetime.now().isoformat(),
-                "videos": {} # Inicializa a subcoleção de vídeos
+                    "name": project_name,
+                    "createdAt": datetime.now().isoformat(),
+                    "videos": {}
                 })
-            # Adicionar o vídeo ao sub-nó 'videos' do projeto
             video_ref = project_ref.child(f'videos/{video_id}')
             video_ref.set(video_metadata_for_firebase)
 
@@ -880,8 +917,18 @@ def upload_video():
                 "video_id": video_id,
                 "filename": original_filename,
                 "project_name": project_name
+            }), 201
 
-            }), 201 # 201 Created
+    except Exception as e:
+        logger.exception("Erro ao atualizar metadados no Firebase")
+        # cleanup em caso de erro
+        try:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+        except Exception:
+            pass
+        return jsonify({"message": f"Erro interno do servidor: {str(e)}"}), 500
+
 
 
 @app.route('/api/projects/<project_name>/videos/<video_id>/download', methods=['GET'])
