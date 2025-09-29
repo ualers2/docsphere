@@ -31,6 +31,12 @@ jobs:
         echo "known_hosts:"
         cat ~/.ssh/known_hosts 
 
+    - name: permissão
+      run: |
+        ssh ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} "
+          sudo chown -R ${{ secrets.DEPLOY_USER }}: $HOME/deploys/docsphere
+          sudo chmod -R u+rwX $HOME/deploys/docsphere
+        "
     - name: Copy entire project to VPS
       run: |
         rsync -avz --delete ./ ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/home/administrator/deploys/docsphere \
