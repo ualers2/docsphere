@@ -72,6 +72,7 @@ VIDEO_BASE_DIR = os.path.join(os.path.dirname(__file__), 'videos')
 ALLOWED_EXTENSIONS = {
     'mp4',
     'txt',
+    'pem',
     'srt', 'ass', 'pickle', 'json',
     'wav',
     'jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp',
