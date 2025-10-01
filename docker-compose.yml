@@ -64,7 +64,7 @@ services:
       "--timeout-keep-alive", "3600"
     ]
     volumes:
-      - ./Back-End:/app
+      # - ./Back-End:/app
       - files_data:/app/videos
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:4251"] 
