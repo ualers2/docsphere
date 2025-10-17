@@ -79,7 +79,7 @@ services:
 
 networks:
   rede_externa:
-    external: true
+    external: false
 
 volumes:
   files_data:
