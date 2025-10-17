@@ -45,7 +45,7 @@ services:
     networks:
       - rede_externa
     mem_limit: 500MB
-    cpus: "1.5"
+    cpus: "0.5"
 
   docserver_api_1:
     build:
@@ -72,7 +72,7 @@ services:
       timeout: 2s
       retries: 5
     mem_limit: 500MB
-    cpus: "1.5"
+    cpus: "0.5"
     networks:
       - rede_externa
 
