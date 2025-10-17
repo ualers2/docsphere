@@ -31,6 +31,11 @@ jobs:
         echo "known_hosts:"
         cat ~/.ssh/known_hosts 
 
+    - name: Make dir on VPS
+      run: |
+        ssh ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} "
+          mkdir -p /root/deploys
+        "
     - name: Copy entire project to VPS
       run: |
         rsync -avz --delete ./ ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/root/deploys/docsphere \
