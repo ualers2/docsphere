@@ -33,7 +33,7 @@ jobs:
 
     - name: Copy entire project to VPS
       run: |
-        rsync -avz --delete ./ ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/home/administrator/deploys/docsphere \
+        rsync -avz --delete ./ ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/deploys/docsphere \
           --exclude node_modules \
           --exclude .git \
           --exclude Front-End/node_modules
@@ -41,33 +41,33 @@ jobs:
     - name: Make dir on VPS
       run: |
         ssh ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} "
-          mkdir -p /home/administrator/deploys/docsphere/Back-End/Keys && \
-          mkdir -p /home/administrator/deploys/docsphere/Front-End
+          mkdir -p /deploys/docsphere/Back-End/Keys && \
+          mkdir -p /deploys/docsphere/Front-End
         "
 
 
     - name: Create keys.env on VPS
       run: |
         ssh ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} "
-          printf '%s' '${{ secrets.BACK_END_ENV_KEYS }}' > /home/administrator/deploys/docsphere/Back-End/Keys/keys.env
+          printf '%s' '${{ secrets.BACK_END_ENV_KEYS }}' > /deploys/docsphere/Back-End/Keys/keys.env
         "
 
     - name: Create .env on VPS
       run: |
         ssh ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} "
-          printf '%s' '${{ secrets.FRONT_END_ENV_KEYS }}' > /home/administrator/deploys/docsphere/Front-End/.env
+          printf '%s' '${{ secrets.FRONT_END_ENV_KEYS }}' > /deploys/docsphere/Front-End/.env
         "
 
     - name: Create Firebase.json on VPS
       run: |
         ssh ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} "
-          echo '${{ secrets.FIREBASE_KEYS }}' | base64 --decode > /home/administrator/deploys/docsphere/Back-End/Keys/Firebase.json
+          echo '${{ secrets.FIREBASE_KEYS }}' | base64 --decode > /deploys/docsphere/Back-End/Keys/Firebase.json
         "
 
     - name: Deploy Docker Compose
       run: |
         ssh ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} "
-          cd /home/administrator/deploys/docsphere && \
+          cd /deploys/docsphere && \
 
           # --- Delet, Build, Tag e Push dos agentes ---
           docker rmi $(docker images -f "dangling=true" -q) && \
