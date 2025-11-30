@@ -5,5 +5,7 @@ python-dotenv
 firebase-admin 
 requests 
 waitress
-uvicorn
+uvicorn 
+gunicorn
 asgiref
+pytz
