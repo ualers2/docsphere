@@ -35,19 +35,20 @@ app_instance = initialize_app(cred, {
 
 
 app = Flask(__name__)
-CORS(app, resources={
-    r"/api/*": {
-        "origins": [
-            "http://localhost:4343",
-            "https://4b5664b86dca.ngrok-free.app",
-            "https://2bb8e949eac6.ngrok-free.app",
-            "https://a7ae3fc28c35.ngrok-free.app"
-        ],
-        "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"],
-        "allow_headers": ["Content-Type", "Authorization", "X-User-Id"],
-        "supports_credentials": True
-    }
-})
+if os.getenv("FLASK_ENV") == "development":
+    CORS(app, resources={
+        r"/api/*": {
+            "origins": [
+                "http://localhost:4343",
+                "https://4b5664b86dca.ngrok-free.app",
+                "https://2bb8e949eac6.ngrok-free.app",
+                "https://a7ae3fc28c35.ngrok-free.app"
+            ],
+            "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"],
+            "allow_headers": ["Content-Type", "Authorization", "X-User-Id"],
+            "supports_credentials": True
+        }
+    })
 
 asgi_app = WsgiToAsgi(app)
 
