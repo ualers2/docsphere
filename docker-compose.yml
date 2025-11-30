@@ -49,6 +49,7 @@ services:
     volumes:
       # - ./Back-End:/app
       - files_data:/app/videos
+      - ./Back-End/Logs:/app/Logs
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:4154"] 
       interval: 129s
