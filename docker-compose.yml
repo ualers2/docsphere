@@ -2,7 +2,6 @@
 # version: '2.2'
 # default version 
 version: '3.8'
-
 services:
   frontend_docserver:
     container_name: frontend_docserver
