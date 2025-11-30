@@ -55,6 +55,9 @@ asgi_app = WsgiToAsgi(app)
 app.secret_key = 'sua_chave_secreta'  # Substitua por uma chave forte e secreta
 app.permanent_session_lifetime = timedelta(minutes=60)  # Sessão válida por 60 minutos
 
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
 diretorio_script = os.path.dirname(os.path.abspath(__file__)) 
 
 logger = logging.getLogger(__name__)
