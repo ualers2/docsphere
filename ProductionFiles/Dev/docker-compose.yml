@@ -4,6 +4,21 @@
 version: '3.8'
 
 services:
+
+  nginx_proxy_server:
+    build:
+      context: ./Nginx
+      dockerfile: Dockerfile
+    container_name: nginx_proxy_server
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - docserver_api_1
+    restart: "no"
+    networks:
+      - rede_externa
+
   frontend_docserver:
     container_name: frontend_docserver
     build:

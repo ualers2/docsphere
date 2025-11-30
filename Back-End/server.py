@@ -2,6 +2,7 @@
 from flask import Flask, render_template, Response, request, jsonify, session, redirect,send_from_directory,  url_for
 from flask_cors import CORS  
 import time
+import pytz
 import hashlib
 from dotenv import load_dotenv
 import os
@@ -34,15 +35,20 @@ app_instance = initialize_app(cred, {
 
 
 app = Flask(__name__)
-# Apenas libera a URL efêmera de teste
-# CORS(app, resources={
-#     r"/api/*": {
-#         "origins": ["http://localhost:3007"],
-#         "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"],
-#         "allow_headers": ["Content-Type", "Authorization", "X-User-Id"],
-#         "supports_credentials": True
-#     }
-# })
+CORS(app, resources={
+    r"/api/*": {
+        "origins": [
+            "http://localhost:4343",
+            "https://4b5664b86dca.ngrok-free.app",
+            "https://2bb8e949eac6.ngrok-free.app",
+            "https://a7ae3fc28c35.ngrok-free.app"
+        ],
+        "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"],
+        "allow_headers": ["Content-Type", "Authorization", "X-User-Id"],
+        "supports_credentials": True
+    }
+})
+
 asgi_app = WsgiToAsgi(app)
 
 app.secret_key = 'sua_chave_secreta'  # Substitua por uma chave forte e secreta
@@ -305,6 +311,80 @@ def create_project():
             "createdAt": datetime.utcnow().isoformat(),
             "videos": {}
         })
+
+        return jsonify({
+            "message": "Projeto criado com sucesso",
+            "project_name": project_name,
+            "safe_project_name": safe_project_name_filter
+        }), 201
+
+    except Exception as e:
+        logger.error(f"Erro ao criar projeto no Firebase: {e}", exc_info=True)
+        return jsonify({"message": "Erro interno ao criar projeto"}), 500
+    
+
+@app.route('/api/projects/create/video', methods=['POST'])
+def create_video_project():
+    """
+    Cria um projeto vazio para o usuário.
+
+    """
+    authenticated_user_id, authenticated_user_id_filter = authenticate_user(request)
+    if not authenticated_user_id:
+        return jsonify({"message": "Autenticação necessária"}), 401
+
+    data = request.get_json() or {}
+    project_name = data.get("projectName")
+    model_ai = data.get("model_ai", "")
+    type_project = data.get("type_project", "video")
+    pasted_url = data.get("pasted_url")
+    thumbnail_url = data.get("thumbnail_url")
+
+    if not project_name:
+        return jsonify({"message": "Nome do projeto é obrigatório"}), 400
+
+    # Sanitização do nome do projeto
+    safe_project_name = secure_filename(project_name).replace("-", "").replace("....", "").replace("...", "").replace("..", "").replace(".", "").replace("... - ", "").replace('"????????"', '').replace("...__", "_")
+    safe_project_name_filter = re.sub(r'[^0-9A-Za-z_-]', '', safe_project_name)
+
+    user_key = authenticated_user_id.replace('.', '_')
+    user_dir = os.path.join(VIDEO_BASE_DIR, user_key)
+    project_dir = os.path.join(user_dir, safe_project_name_filter)
+
+    # Criação do diretório físico
+    try:
+        os.makedirs(project_dir, exist_ok=True)
+    except Exception as e:
+        logger.error(f"Erro ao criar diretório do projeto: {e}", exc_info=True)
+        return jsonify({"message": "Erro ao criar diretório do projeto no servidor"}), 500
+
+    # Criação do nó no Firebase
+    project_ref = db.reference(f'projects/{user_key}/{safe_project_name_filter}', app=app_instance)
+    try:
+        existing_project = project_ref.get()
+        if existing_project:
+            return jsonify({"message": "Projeto já existe"}), 400
+
+        tz_str = 'America/Sao_Paulo'
+        try:
+            tz = pytz.timezone(tz_str)
+        except Exception as e:
+            return jsonify({'error': f'Timezone inválido: {str(e)}'}), 400
+
+        data_to_save = {
+            "name": project_name,
+            "model_ai": model_ai,
+            "status": "Created",
+            "url_original": pasted_url,
+            "type_project": type_project,
+            "progress_percent": "0",
+            "used": False,
+            "thumbnail_url": thumbnail_url,
+            "createdAt": datetime.now(tz).isoformat(),
+            "delete_after": (datetime.now(tz) + timedelta(days=3)).isoformat(),  # data 3 dias à frente
+            "videos": {}
+        }
+        project_ref.set(data_to_save)
 
         return jsonify({
             "message": "Projeto criado com sucesso",
