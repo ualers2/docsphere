@@ -71,6 +71,7 @@ console_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
 logger.addHandler(console_handler)
 
+logger.info("Logger configured and server starting")
 
 
 
@@ -307,13 +308,23 @@ def create_project():
             return jsonify({"message": "Projeto já existe"}), 400
 
         project_ref.set({
+            "processing_time": "00:00:00",
+            "success_rate": "0%",
             "name": project_name,
+            "progress_percent": "0",
+            "status": "NEW",
+            "thumbnail_url": "None",
+            "url_original": "None",
             "model_ai": model_ai,
             "type_project": type_project,
-            "status": "NEW",
             "used": False,
             "createdAt": datetime.utcnow().isoformat(),
-            "videos": {}
+            "videos": {
+                "status": "None"
+            },
+            "metadata": {
+                "status": "None"
+            }
         })
 
         return jsonify({
@@ -325,6 +336,85 @@ def create_project():
     except Exception as e:
         logger.error(f"Erro ao criar projeto no Firebase: {e}", exc_info=True)
         return jsonify({"message": "Erro interno ao criar projeto"}), 500
+    
+
+@app.route('/api/projects/<project_name>', methods=['PUT'])
+def update_project(project_name):
+    """
+    Atualiza informações de um projeto existente.
+    Espera JSON com campos opcionais:
+    {
+        "projectName": "Novo Nome do Projeto",
+        "model_ai": "novo_modelo",
+        "type_project": "video" ou "files",
+        "status": "NEW" ou outro,
+        "progress_percent": "0",
+        "thumbnail_url": "url",
+        "url_original": "url",
+        "used": true/false,
+        "processing_time": "00:00:00",
+        "success_rate": "0%",
+        "videos": {"status": "None", ...},  // sub-objetos para atualizar
+        "metadata": {"status": "None", ...}
+    }
+    """
+    authenticated_user_id, authenticated_user_id_filter = authenticate_user(request)
+    if not authenticated_user_id:
+        return jsonify({"message": "Autenticação necessária"}), 401
+
+    data = request.get_json() or {}
+
+    # Sanitização do nome do projeto para buscar
+    safe_project_name = secure_filename(project_name).replace("-", "").replace("....", "").replace("...", "").replace("..", "").replace(".", "").replace("... - ", "").replace('"????????"', '').replace("...__", "_")
+    safe_project_name_filter = re.sub(r'[^0-9A-Za-z_-]', '', safe_project_name)
+
+    user_key = authenticated_user_id.replace('.', '_')
+    project_ref = db.reference(f'projects/{user_key}/{safe_project_name_filter}', app=app_instance)
+    try:
+        existing_project = project_ref.get()
+        if not existing_project:
+            return jsonify({"message": "Projeto não encontrado"}), 404
+
+        # Campos a atualizar
+        updates = {}
+        if 'projectName' in data:
+            updates['name'] = data['projectName']
+        if 'model_ai' in data:
+            updates['model_ai'] = data['model_ai']
+        if 'type_project' in data:
+            updates['type_project'] = data['type_project']
+        if 'status' in data:
+            updates['status'] = data['status']
+        if 'progress_percent' in data:
+            updates['progress_percent'] = data['progress_percent']
+        if 'thumbnail_url' in data:
+            updates['thumbnail_url'] = data['thumbnail_url']
+        if 'url_original' in data:
+            updates['url_original'] = data['url_original']
+        if 'used' in data:
+            updates['used'] = data['used']
+        if 'processing_time' in data:
+            updates['processing_time'] = data['processing_time']
+        if 'success_rate' in data:
+            updates['success_rate'] = data['success_rate']
+        # Para sub-objetos videos e metadata, se fornecidos como dict, atualizar
+        if 'videos' in data and isinstance(data['videos'], dict):
+            for k, v in data['videos'].items():
+                updates[f'videos/{k}'] = v
+        if 'metadata' in data and isinstance(data['metadata'], dict):
+            for k, v in data['metadata'].items():
+                updates[f'metadata/{k}'] = v
+
+        if not updates:
+            return jsonify({"message": "Nenhum campo válido para atualizar"}), 400
+
+        project_ref.update(updates)
+
+        return jsonify({"message": "Projeto atualizado com sucesso"}), 200
+
+    except Exception as e:
+        logger.error(f"Erro ao atualizar projeto no Firebase: {e}", exc_info=True)
+        return jsonify({"message": "Erro interno ao atualizar projeto"}), 500
     
 
 @app.route('/api/projects/create/video', methods=['POST'])
