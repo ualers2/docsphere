@@ -262,6 +262,48 @@ def get_user_projects():
     except Exception as e:
         return jsonify({"message": f"Erro ao buscar projetos: {str(e)}"}), 500
 
+@app.route('/api/projects/<project_name>', methods=['GET'])
+def get_project(project_name):
+    authenticated_user_id, authenticated_user_id_filter = authenticate_user(request)
+    if not authenticated_user_id:
+        return jsonify({"message": "Autenticação necessária"}), 401
+
+    # Sanitização do nome do projeto
+    safe_project_name = secure_filename(project_name).replace("-", "").replace("....", "").replace("...", "").replace("..", "").replace(".", "").replace("... - ", "").replace('"????????"', '').replace("...__", "_")
+    safe_project_name_filter = re.sub(r'[^0-9A-Za-z_-]', '', safe_project_name)
+
+    try:
+        ref = db.reference(f'projects/{authenticated_user_id_filter}/{safe_project_name_filter}', app=app_instance)
+        project_data = ref.get()
+
+        if not project_data:
+            return jsonify({"message": "Projeto não encontrado"}), 404
+
+        # Formata os dados para o frontend, removendo `serverFilePath`
+        videos_list = []
+        if 'videos' in project_data:
+            for video_id, video_data in project_data['videos'].items():
+                # Crie um novo dicionário sem serverFilePath
+                safe_video_data = {k: v for k, v in video_data.items() if k != 'serverFilePath'}
+                safe_video_data['id'] = video_id  # Adiciona o ID do Firebase ao objeto
+                videos_list.append(safe_video_data)
+        
+        formatted_project = {
+            "name": project_data.get("name", project_name),
+            "model_ai": project_data.get("model_ai"),
+            "status": project_data.get("status"),
+            "used": project_data.get("used"),
+            "progress_percent": project_data.get("progress_percent"),
+            "url_original": project_data.get("url_original"),
+            "thumbnail_url": project_data.get("thumbnail_url"),
+            "createdAt": project_data.get("createdAt"),
+            "videos": videos_list
+        }
+        return jsonify(formatted_project), 200
+
+    except Exception as e:
+        return jsonify({"message": f"Erro ao buscar projeto: {str(e)}"}), 500
+
 @app.route('/api/projects/create', methods=['POST'])
 def create_project():
     """
@@ -336,7 +378,6 @@ def create_project():
     except Exception as e:
         logger.error(f"Erro ao criar projeto no Firebase: {e}", exc_info=True)
         return jsonify({"message": "Erro interno ao criar projeto"}), 500
-    
 
 @app.route('/api/projects/<project_name>', methods=['PUT'])
 def update_project(project_name):
@@ -490,21 +531,6 @@ def create_video_project():
         logger.error(f"Erro ao criar projeto no Firebase: {e}", exc_info=True)
         return jsonify({"message": "Erro interno ao criar projeto"}), 500
     
-@app.route('/api/list-projects', methods=['GET'])
-def list_projects():
-    authenticated_user_id, authenticated_user_id_filter = authenticate_user(request)
-    if not authenticated_user_id:
-        return jsonify({"message": "Autenticação necessária"}), 401
-
-    projects_ref = db.reference(f'projects/{authenticated_user_id_filter}', app=app_instance)
-    projects = projects_ref.get() or {}
-
-    result = [
-        {"id": key, "name": data.get("name", key), "fileCount": len(data.get("videos", {}))}
-        for key, data in projects.items()
-    ]
-    return jsonify(result), 200
-
 
 @app.route('/api/settings', methods=['GET'])
 def get_user_settings():
