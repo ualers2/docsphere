@@ -1071,6 +1071,7 @@ def upload_files():
                 "minutagemdeFim": metadata.get('minutagemdeFim', 'Fim'),
                 "urltumbnail": metadata.get('urltumbnail', ''),
                 "justificativa": metadata.get('justificativa', ''),
+                "analise_face_tracking": metadata.get('analise_face_tracking', None),
                 "sentimento_principal": metadata.get('sentimento_principal', ''),
                 "potencial_de_viralizacao": metadata.get('potencial_de_viralizacao', ''),
             })
