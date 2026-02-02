@@ -1071,9 +1071,16 @@ def upload_files():
                 "minutagemdeFim": metadata.get('minutagemdeFim', 'Fim'),
                 "urltumbnail": metadata.get('urltumbnail', ''),
                 "justificativa": metadata.get('justificativa', ''),
-                "analise_face_tracking": metadata.get('analise_face_tracking', None),
                 "sentimento_principal": metadata.get('sentimento_principal', ''),
                 "potencial_de_viralizacao": metadata.get('potencial_de_viralizacao', ''),
+
+                "srt_file_content": metadata.get('srt_file_content', ''),
+                "srt_faces_file_content": metadata.get('srt_faces_file_content', ''),
+                "diarization_content": metadata.get('diarization_content', ''),
+                "audio_summarization_content": metadata.get('audio_summarization_content', ''),
+                "sentiment_analyzer_content": metadata.get('sentiment_analyzer_content', ''),
+                "analise_face_tracking": metadata.get('analise_face_tracking', None),
+                "orientation": metadata.get('orientation', 'vertical'),
             })
             if isinstance(update_data["hashtags"], str):
                 update_data["hashtags"] = [tag.strip() for tag in update_data["hashtags"].split(',') if tag.strip()]
